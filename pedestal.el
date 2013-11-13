@@ -46,7 +46,7 @@ does not support vars.
 
 The render configuration needs to have been previously set using:
 
-  M-x set-variable \"your.app.rendering.render-config\"
+  M-x set-variable pedestal-render-config <ENTER> \"(your.app.rendering.render-config)\"
 "
   (interactive)
   (nrepl-interactive-eval (format "(io.pedestal.app-tools.rendering-view.client.main %s true)" pedestal-render-config)))
