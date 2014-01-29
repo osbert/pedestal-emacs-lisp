@@ -39,6 +39,16 @@
   :type 'string
   :group 'pedestal)
 
+(defcustom pedestal-cljs-nrepl-buffer "*nrepl*"
+  "CLJS browser REPL buffer."
+  :type 'string
+  :group 'pedestal)
+
+(defcustom pedestal-clj-nrepl-buffer "*nrepl*<2>"
+  "CLJ server REPL buffer."
+  :type 'string
+  :group 'pedestal)
+
 (defun pedestal-reload ()
   "When in the render tooling, reload the app, allowing
 render-configuration changes to get picked up since ClojureScript
@@ -49,4 +59,39 @@ The render configuration needs to have been previously set using:
   M-x set-variable pedestal-render-config <ENTER> \"(your.app.rendering.render-config)\"
 "
   (interactive)
-  (nrepl-interactive-eval (format "(io.pedestal.app-tools.rendering-view.client.main %s true)" pedestal-render-config)))
+  (with-current-buffer pedestal-cljs-nrepl-buffer
+    (nrepl-interactive-eval (format "(io.pedestal.app-tools.rendering-view.client.main %s true)" pedestal-render-config))))
+
+(defcustom pedestal-templates-var nil
+  "Var representing macro that generates templates.  This should be an s-exp like:  (client.html-templates/client-templates)"
+  :type 'sexp
+  :group 'pedestal)
+
+(defcustom pedestal-main nil
+  "s-exp for creating and starting your pedestal app.  For example:  (client.start/main)"
+  :type 'sexp
+  :group 'pedestal)
+
+(defun pedestal-reload-templates ()
+  "Allow for interactive template modification.
+
+Pedestal utilizes Enlive on the server side and uses a macro to
+generate the CLJS side templates. However, it difficult to get
+the macro definition reloaded from a bREPL. To work around this,
+we evaluate the macro again in the server side REPL, then
+redefine the template var in the bREPL with the new expansion.
+
+NOTE: Your current bREPL namespace must be the rendering
+namespace where templates are reference, by default this is
+something like:
+
+  client.rendering
+"
+  (interactive)
+  (with-current-buffer pedestal-clj-nrepl-buffer
+    (nrepl-macroexpand-expr 'macroexpand pedestal-templates-var))
+  (let ((expansion (with-current-buffer nrepl-macroexpansion-buffer
+                     (buffer-substring-no-properties (point-min) (point-max)))))
+    (with-current-buffer pedestal-cljs-nrepl-buffer
+      (nrepl-interactive-eval (format "(def templates %s) %s" expansion pedestal-main))))
+  (nrepl--close-connection-buffer nrepl-macroexpansion-buffer))
